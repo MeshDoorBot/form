@@ -13,107 +13,113 @@
       max-width: 500px;
       margin: auto;
     }
-    h1 {
-      text-align: center;
-      font-size: 1.8rem;
-      margin-bottom: 1.5rem;
-    }
     label {
       display: block;
-      margin-top: 1rem;
+      margin-top: 1.5rem;
     }
-    input, select, button {
+    select, input[type="file"] {
       width: 100%;
+      padding: 0.8rem;
       margin-top: 0.5rem;
-      padding: 0.75rem;
-      font-size: 1rem;
-      border: none;
       border-radius: 6px;
+      border: none;
+      font-size: 1rem;
     }
     button {
+      margin-top: 2rem;
+      width: 100%;
+      padding: 1rem;
+      font-size: 1rem;
       background: #fff;
       color: #000;
-      margin-top: 2rem;
+      border: none;
+      border-radius: 6px;
       cursor: pointer;
     }
-    #success {
-      display: none;
+    #msg {
+      margin-top: 1.5rem;
       text-align: center;
-      color: #0f0;
-      margin-top: 1rem;
+      font-size: 1rem;
     }
   </style>
 </head>
 <body>
-  <h1>📸 Upload Show Artwork</h1>
+
+  <h2>📤 Upload Show Artwork</h2>
+
   <form id="uploadForm">
-    <label for="show">Select your show:</label>
-    <select name="show" id="show" required>
+    <label for="show">Select Your Show</label>
+    <select id="show" name="showId" required>
       <option value="">Loading shows...</option>
     </select>
 
-    <label for="file">Upload image:</label>
-    <input type="file" id="file" name="file" accept="image/*" required />
+    <label for="artwork">Upload Image</label>
+    <input type="file" id="artwork" name="artwork" accept="image/*" required />
 
-    <button type="submit">Upload Artwork</button>
+    <button type="submit">Upload</button>
   </form>
 
-  <div id="success">✅ Uploaded successfully!</div>
+  <div id="msg"></div>
 
-  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script>
-    const showSelect = document.getElementById('show');
+    const showDropdown = document.getElementById('show');
     const form = document.getElementById('uploadForm');
-    const successMsg = document.getElementById('success');
-    const csvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTavGvSojxM1vYpMv0FSoC-WzIK3IqTYPNl1SYbya4iV8VJUaEmHso7yghmGQPLJvwpsEMzKjbonPDz/pub?output=csv';
-    const scriptUrl = 'https://script.google.com/macros/s/AKfycbwpvIeXKPbwW-kB3JzxmxG-cmYpQIGXnoHKxe8OBILqBiF3GfRnrZitopxAsmC9uGvCbQ/exec';
+    const msg = document.getElementById('msg');
 
-    // Populate show dropdown
-    fetch(csvUrl)
+    const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTavGvSojxM1vYpMv0FSoC-WzIK3IqTYPNl1SYbya4iV8VJUaEmHso7yghmGQPLJvwpsEMzKjbonPDz/pub?output=csv';
+    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwpvIeXKPbwW-kB3JzxmxG-cmYpQIGXnoHKxe8OBILqBiF3GfRnrZitopxAsmC9uGvCbQ/exec';
+
+    // Load shows into dropdown
+    fetch(SHEET_CSV_URL)
       .then(res => res.text())
       .then(csv => {
-        Papa.parse(csv, {
-          header: true,
-          complete: function(results) {
-            const shows = results.data;
-            showSelect.innerHTML = '<option value="">-- Select --</option>';
-            shows.forEach(row => {
-              if (row['Show ID'] && row['DJ']) {
-                const opt = document.createElement('option');
-                opt.value = row['Show ID'];
-                opt.textContent = row['DJ'];
-                showSelect.appendChild(opt);
-              }
-            });
+        const lines = csv.trim().split('\n').slice(1);
+        const seen = new Set();
+        showDropdown.innerHTML = '<option value="">-- Select --</option>';
+        lines.forEach(row => {
+          const [showId, dj] = row.split(',').map(cell => cell.trim());
+          if (showId && dj && !seen.has(showId)) {
+            seen.add(showId);
+            const opt = document.createElement('option');
+            opt.value = showId;
+            opt.textContent = dj;
+            showDropdown.appendChild(opt);
           }
         });
       });
 
-    form.addEventListener('submit', async (e) => {
+    // Handle form submission
+    form.addEventListener('submit', e => {
       e.preventDefault();
-      const showId = showSelect.value;
-      const fileInput = document.getElementById('file');
-      const file = fileInput.files[0];
-      if (!showId || !file) return alert('Please select your show and image.');
+      msg.textContent = 'Uploading...';
 
       const formData = new FormData();
+      const file = document.getElementById('artwork').files[0];
+      const showId = document.getElementById('show').value;
+
+      if (!showId || !file) {
+        msg.textContent = '❌ Please select a show and a file.';
+        return;
+      }
+
       formData.append('showId', showId);
       formData.append('file', file);
 
-      try {
-        const res = await fetch(scriptUrl, {
-          method: 'POST',
-          body: formData
-        });
-        const text = await res.text();
-        console.log('Upload response:', text);
+      fetch(SCRIPT_URL, {
+        method: 'POST',
+        body: formData
+      })
+      .then(res => res.text())
+      .then(text => {
+        msg.textContent = text.includes('✅') ? '✅ Uploaded successfully!' : '❌ ' + text;
         form.reset();
-        successMsg.style.display = 'block';
-      } catch (err) {
-        alert('❌ Upload failed.');
+      })
+      .catch(err => {
+        msg.textContent = '❌ Upload failed. Try again.';
         console.error(err);
-      }
+      });
     });
   </script>
+
 </body>
 </html>
