@@ -9,106 +9,110 @@
       background: #111;
       color: #fff;
       font-family: sans-serif;
+      padding: 2rem;
       max-width: 500px;
-      margin: 2rem auto;
-      padding: 1rem;
+      margin: auto;
+    }
+    h1 {
+      text-align: center;
+      font-size: 1.8rem;
+      margin-bottom: 1.5rem;
     }
     label {
       display: block;
-      margin: 1rem 0 0.3rem;
+      margin-top: 1rem;
     }
-    select, input[type="file"], button {
+    input, select, button {
       width: 100%;
+      margin-top: 0.5rem;
       padding: 0.75rem;
       font-size: 1rem;
       border: none;
       border-radius: 6px;
-      margin-bottom: 1rem;
     }
     button {
       background: #fff;
       color: #000;
-      font-weight: bold;
+      margin-top: 2rem;
       cursor: pointer;
     }
     #success {
+      display: none;
       text-align: center;
       color: #0f0;
-      display: none;
+      margin-top: 1rem;
     }
   </style>
 </head>
 <body>
-  <h1>🎨 Upload Show Artwork</h1>
-
+  <h1>📸 Upload Show Artwork</h1>
   <form id="uploadForm">
-    <label for="show">Select your show</label>
-    <select id="show" name="showId" required>
-      <option value="">Loading...</option>
+    <label for="show">Select your show:</label>
+    <select name="show" id="show" required>
+      <option value="">Loading shows...</option>
     </select>
 
-    <label for="artwork">Choose your artwork</label>
-    <input type="file" id="artwork" name="artwork" accept="image/*" required />
+    <label for="file">Upload image:</label>
+    <input type="file" id="file" name="file" accept="image/*" required />
 
-    <button type="submit">Upload</button>
+    <button type="submit">Upload Artwork</button>
   </form>
 
   <div id="success">✅ Uploaded successfully!</div>
 
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script>
-    const sheetURL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTavGvSojxM1vYpMv0FSoC-WzIK3IqTYPNl1SYbya4iV8VJUaEmHso7yghmGQPLJvwpsEMzKjbonPDz/pub?output=csv";
-    const form = document.getElementById('uploadForm');
     const showSelect = document.getElementById('show');
+    const form = document.getElementById('uploadForm');
     const successMsg = document.getElementById('success');
+    const csvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTavGvSojxM1vYpMv0FSoC-WzIK3IqTYPNl1SYbya4iV8VJUaEmHso7yghmGQPLJvwpsEMzKjbonPDz/pub?output=csv';
+    const scriptUrl = 'https://script.google.com/macros/s/AKfycbwpvIeXKPbwW-kB3JzxmxG-cmYpQIGXnoHKxe8OBILqBiF3GfRnrZitopxAsmC9uGvCbQ/exec';
 
-    // Load shows
-    fetch(sheetURL)
+    // Populate show dropdown
+    fetch(csvUrl)
       .then(res => res.text())
       .then(csv => {
-        const rows = Papa.parse(csv, { header: true }).data;
-        showSelect.innerHTML = '<option value="">-- Select Show --</option>';
-        rows.forEach(r => {
-          if (r["Show ID"] && r["DJ"]) {
-            const opt = document.createElement('option');
-            opt.value = r["Show ID"].trim();
-            opt.textContent = r["DJ"].trim();
-            opt.dataset.dj = r["DJ"].trim();
-            showSelect.appendChild(opt);
+        Papa.parse(csv, {
+          header: true,
+          complete: function(results) {
+            const shows = results.data;
+            showSelect.innerHTML = '<option value="">-- Select --</option>';
+            shows.forEach(row => {
+              if (row['Show ID'] && row['DJ']) {
+                const opt = document.createElement('option');
+                opt.value = row['Show ID'];
+                opt.textContent = row['DJ'];
+                showSelect.appendChild(opt);
+              }
+            });
           }
         });
       });
 
-    // Upload
-    form.addEventListener("submit", async (e) => {
+    form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const showId = showSelect.value;
-      const dj = showSelect.options[showSelect.selectedIndex].dataset.dj;
-      const file = document.getElementById('artwork').files[0];
+      const fileInput = document.getElementById('file');
+      const file = fileInput.files[0];
+      if (!showId || !file) return alert('Please select your show and image.');
 
-      if (!showId || !file) return alert("Please select a show and a file.");
+      const formData = new FormData();
+      formData.append('showId', showId);
+      formData.append('file', file);
 
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const base64String = reader.result.split(',')[1];
-
-        const body = new URLSearchParams();
-        body.append("showId", showId);
-        body.append("dj", dj);
-        body.append("file", base64String);
-        body.append("filename", file.name);
-        body.append("mimeType", file.type);
-
-        const scriptURL = "https://script.google.com/macros/s/AKfycbwpvIeXKPbwW-kB3JzxmxG-cmYpQIGXnoHKxe8OBILqBiF3GfRnrZitopxAsmC9uGvCbQ/exec";
-        const res = await fetch(scriptURL, { method: "POST", body });
+      try {
+        const res = await fetch(scriptUrl, {
+          method: 'POST',
+          body: formData
+        });
         const text = await res.text();
-        console.log(text);
-
-        successMsg.style.display = 'block';
+        console.log('Upload response:', text);
         form.reset();
-        showSelect.selectedIndex = 0;
-      };
-      reader.readAsDataURL(file);
+        successMsg.style.display = 'block';
+      } catch (err) {
+        alert('❌ Upload failed.');
+        console.error(err);
+      }
     });
   </script>
 </body>
