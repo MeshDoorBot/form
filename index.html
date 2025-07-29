@@ -56,44 +56,11 @@
       color: #0f0;
       display: none;
     }
-    #artworkSection, #moreFields {
+    #extra-fields {
       display: none;
-      transition: all 0.3s ease;
-    }
-    #artworkPopup {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: #000d;
-      z-index: 9999;
-      padding: 2rem;
-    }
-    #artworkPopup iframe {
-      width: 100%;
-      height: 100%;
-      border: 0;
-    }
-    #artworkPopup div {
-      position: relative;
-      max-width: 1000px;
-      height: 90vh;
-      margin: auto;
-      background: #111;
-      border-radius: 10px;
-      overflow: hidden;
-    }
-    #artworkPopup button {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      z-index: 9999;
-      background: #fff;
-      color: #000;
-      border: none;
-      padding: 0.5rem 1rem;
-      font-size: 1rem;
-      cursor: pointer;
-      border-radius: 6px;
+      margin-top: 2rem;
+      border-top: 1px solid #444;
+      padding-top: 1.5rem;
     }
   </style>
 </head>
@@ -106,17 +73,15 @@
       <option value="">Loading shows...</option>
     </select>
 
-    <div id="artworkSection">
-      <label for="art">
-        Artwork filename or URL
-        <small><a href="#" onclick="openPopup()">Launch the Artwork Generator</a> and paste the file name here after export.</small>
-      </label>
-      <input type="text" id="art" name="art" placeholder="e.g. mesh-show.jpg" />
+    <label for="art">
+      Upload Artwork
+      <small>Or use the <a href="https://dj-artwork3-38cz.vercel.app/" target="_blank">Artwork Generator</a> to create artwork for SoundCloud.</small>
+    </label>
+    <input type="file" id="art" name="art" accept="image/*" />
 
-      <button type="button" onclick="revealMore()">Update Show Info</button>
-    </div>
+    <button type="button" id="showExtra">Update Show Info</button>
 
-    <div id="moreFields">
+    <div id="extra-fields">
       <label for="showName">Change Show Name</label>
       <input type="text" id="showName" name="showName" placeholder="New show name" />
 
@@ -138,95 +103,94 @@
 
   <div id="success">✅ Your update has been submitted!</div>
 
-  <div id="artworkPopup">
-    <div>
-      <button onclick="closePopup()">Close</button>
-      <iframe src="https://dj-artwork3-38cz.vercel.app/"></iframe>
-    </div>
-  </div>
-
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script>
     const showSelect = document.getElementById('show');
     const form = document.getElementById('updateForm');
     const successMsg = document.getElementById('success');
-    const artworkSection = document.getElementById('artworkSection');
-    const moreFields = document.getElementById('moreFields');
-
-    const csvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTavGvSojxM1vYpMv0FSoC-WzIK3IqTYPNl1SYbya4iV8VJUaEmHso7yghmGQPLJvwpsEMzKjbonPDz/pub?output=csv';
+    const extraFields = document.getElementById('extra-fields');
+    const showExtraBtn = document.getElementById('showExtra');
     const scriptUrl = 'https://script.google.com/macros/s/AKfycbxHZ1MtV2323U9oQ9lRJPExbdlvf-XXe6CTPvkUvAwZHyVi2zzMxpu7aimMMoShjR-e/exec';
+    const csvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTavGvSojxM1vYpMv0FSoC-WzIK3IqTYPNl1SYbya4iV8VJUaEmHso7yghmGQPLJvwpsEMzKjbonPDz/pub?output=csv';
+
+    showExtraBtn.addEventListener('click', () => {
+      extraFields.style.display = 'block';
+      showExtraBtn.style.display = 'none';
+    });
 
     Papa.parse(csvUrl, {
       download: true,
       header: true,
-      complete: function(results) {
-        const rows = results.data;
+      complete: (results) => {
         const added = new Set();
-        rows.forEach(row => {
-          const showID = row['Show ID']?.trim();
-          const dj = row['DJ']?.trim();
-          if (showID && dj && !added.has(showID)) {
+        results.data.forEach(row => {
+          const showID = row["Show ID"]?.trim();
+          const djName = row["DJ"]?.trim();
+          if (showID && djName && !added.has(showID)) {
             added.add(showID);
             const opt = document.createElement('option');
             opt.value = showID;
-            opt.textContent = dj;
+            opt.textContent = djName;
             showSelect.appendChild(opt);
           }
         });
-        showSelect.options[0].text = '-- Select --';
+        if (showSelect.options.length > 1) {
+          showSelect.options[0].text = '-- Select --';
+        } else {
+          showSelect.options[0].text = 'No shows found';
+        }
       },
-      error: function(err) {
-        console.error('CSV load error:', err);
+      error: (err) => {
         showSelect.innerHTML = '<option value="">Error loading shows</option>';
+        console.error('CSV load error:', err);
       }
     });
 
-    showSelect.addEventListener('change', () => {
-      if (showSelect.value) {
-        artworkSection.style.display = 'block';
-      } else {
-        artworkSection.style.display = 'none';
-        moreFields.style.display = 'none';
-      }
-    });
-
-    function revealMore() {
-      moreFields.style.display = 'block';
-    }
-
-    function openPopup() {
-      document.getElementById('artworkPopup').style.display = 'block';
-    }
-    function closePopup() {
-      document.getElementById('artworkPopup').style.display = 'none';
-    }
-
-    form.addEventListener('submit', function(e) {
+    form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const formData = new FormData(form);
       const params = new URLSearchParams();
+
       for (const [key, value] of formData.entries()) {
-        params.append(key, value);
+        if (key !== 'art') {
+          params.append(key, value);
+        }
+      }
+
+      const fileInput = document.getElementById('art');
+      const file = fileInput.files[0];
+      if (file) {
+        const base64 = await toBase64(file);
+        params.append('artData', base64);
       }
 
       fetch(scriptUrl, {
         method: 'POST',
-        body: params,
+        body: params
       })
       .then(res => res.text())
       .then(text => {
         form.reset();
         successMsg.style.display = 'block';
-        artworkSection.style.display = 'none';
-        moreFields.style.display = 'none';
+        extraFields.style.display = 'none';
+        showExtraBtn.style.display = 'block';
         window.scrollTo({ top: 0, behavior: 'smooth' });
-        console.log('Response from Apps Script:', text);
+        console.log('Submitted to Google Apps Script:', text);
       })
       .catch(err => {
         alert('❌ Failed to submit. Try again later.');
         console.error('Submission error:', err);
       });
     });
+
+    function toBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
   </script>
 </body>
 </html>
