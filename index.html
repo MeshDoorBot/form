@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Upload Show Artwork</title>
+  <title>Update Show – Mesh Radio</title>
   <style>
     body {
       background: #111;
       color: #fff;
       font-family: sans-serif;
-      max-width: 500px;
+      max-width: 600px;
       margin: auto;
       padding: 2rem;
     }
@@ -19,57 +19,64 @@
     }
     label {
       display: block;
-      margin: 1rem 0 0.3rem;
+      margin: 1rem 0 0.4rem;
     }
-    input, select, button {
+    input, select, textarea {
       width: 100%;
       padding: 0.75rem;
       font-size: 1rem;
-      margin-bottom: 1rem;
       border-radius: 6px;
       border: none;
+      margin-bottom: 1rem;
     }
     button {
+      width: 100%;
       background: #fff;
       color: #000;
+      padding: 1rem;
+      font-size: 1rem;
+      border-radius: 6px;
       cursor: pointer;
     }
-    #status {
+    #success {
       text-align: center;
-      margin-top: 1rem;
+      margin-top: 1.5rem;
       color: #0f0;
       display: none;
     }
   </style>
 </head>
 <body>
-  <h1>📤 Upload Show Artwork</h1>
+  <h1>🎧 Update Your Show</h1>
 
-  <form id="uploadForm">
+  <form id="updateForm">
     <label for="show">Select your show</label>
     <select id="show" name="showId" required>
-      <option value="">Loading...</option>
+      <option value="">Loading shows...</option>
     </select>
 
-    <label for="dj">DJ Name</label>
-    <input type="text" name="dj" id="dj" placeholder="Your DJ name" required />
+    <label for="showNameChange">Show Name Change</label>
+    <input type="text" id="showNameChange" name="showNameChange" placeholder="Enter new show name" />
 
-    <label for="file">Upload Artwork</label>
-    <input type="file" name="file" id="file" accept="image/*" required />
+    <label for="djNameChange">DJ Name Change</label>
+    <input type="text" id="djNameChange" name="djNameChange" placeholder="Enter new DJ name" />
 
-    <button type="submit">Upload</button>
+    <label for="guestUpdates">Guest Updates</label>
+    <input type="text" id="guestUpdates" name="guestUpdates" placeholder="Add guest info" />
+
+    <button type="submit">Submit Update</button>
   </form>
 
-  <div id="status">✅ Upload successful</div>
+  <div id="success">✅ Show updated successfully!</div>
 
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script>
-    const form = document.getElementById('uploadForm');
-    const showSelect = document.getElementById('show');
-    const statusDiv = document.getElementById('status');
-
     const csvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTavGvSojxM1vYpMv0FSoC-WzIK3IqTYPNl1SYbya4iV8VJUaEmHso7yghmGQPLJvwpsEMzKjbonPDz/pub?output=csv';
     const scriptUrl = 'https://script.google.com/macros/s/AKfycby0A5n91-Z_XQtwg46C_bertSdi-RMw7teLWXmx7TNxbbyJh17_gK4R-X2ycaBuVu_0/exec';
+
+    const form = document.getElementById('updateForm');
+    const select = document.getElementById('show');
+    const success = document.getElementById('success');
 
     Papa.parse(csvUrl, {
       download: true,
@@ -77,52 +84,42 @@
       complete: function(results) {
         const added = new Set();
         results.data.forEach(row => {
-          if (row['Show ID'] && row['DJ'] && !added.has(row['Show ID'])) {
-            const opt = document.createElement('option');
-            opt.value = row['Show ID'];
-            opt.textContent = row['DJ'];
-            added.add(row['Show ID']);
-            showSelect.appendChild(opt);
+          const showId = row['Show ID'];
+          const dj = row['DJ'];
+          if (showId && dj && !added.has(showId)) {
+            const option = document.createElement('option');
+            option.value = showId;
+            option.textContent = dj;
+            select.appendChild(option);
+            added.add(showId);
           }
         });
-        showSelect.options[0].text = '-- Select --';
+        select.options[0].text = '-- Select Show --';
       }
     });
 
-    form.addEventListener('submit', function(e) {
+    form.addEventListener('submit', e => {
       e.preventDefault();
-      const fileInput = document.getElementById('file');
-      const file = fileInput.files[0];
-      const reader = new FileReader();
+      const formData = new FormData(form);
+      const data = new URLSearchParams();
+      for (const [key, val] of formData.entries()) {
+        data.append(key, val);
+      }
 
-      reader.onload = function(event) {
-        const base64 = event.target.result.split(',')[1]; // strip the data URL header
-        const data = {
-          showId: form.showId.value,
-          dj: form.dj.value,
-          filename: file.name,
-          file: base64
-        };
-
-        fetch(scriptUrl, {
-          method: 'POST',
-          body: new URLSearchParams(data)
-        })
-        .then(res => res.text())
-        .then(response => {
-          statusDiv.textContent = '✅ Upload successful';
-          statusDiv.style.display = 'block';
-          form.reset();
-        })
-        .catch(err => {
-          statusDiv.textContent = '❌ Upload failed';
-          statusDiv.style.color = '#f00';
-          statusDiv.style.display = 'block';
-          console.error(err);
-        });
-      };
-
-      reader.readAsDataURL(file);
+      fetch(scriptUrl, {
+        method: 'POST',
+        body: data
+      })
+      .then(res => res.text())
+      .then(() => {
+        form.reset();
+        success.style.display = 'block';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      })
+      .catch(err => {
+        alert('❌ Failed to submit.');
+        console.error(err);
+      });
     });
   </script>
 </body>
