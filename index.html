@@ -2,96 +2,130 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Mesh Radio – Update Your Show</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Submit Show Updates</title>
   <style>
     body {
       background: #111;
       color: #fff;
       font-family: sans-serif;
-      max-width: 500px;
+      max-width: 600px;
       margin: auto;
       padding: 2rem;
     }
     h1 {
       text-align: center;
-      font-size: 1.8rem;
       margin-bottom: 2rem;
     }
     label {
       display: block;
-      margin: 1rem 0 0.4rem;
+      margin-top: 1rem;
     }
-    select, input, textarea, button {
+    input, select, button {
       width: 100%;
       padding: 0.75rem;
+      margin-top: 0.3rem;
       font-size: 1rem;
-      margin-bottom: 1rem;
       border-radius: 6px;
       border: none;
-      box-sizing: border-box;
     }
     button {
       background: #fff;
       color: #000;
-      font-weight: bold;
       cursor: pointer;
+      margin-top: 2rem;
     }
-    .note {
-      font-size: 0.9rem;
-      color: #aaa;
-      margin-top: -0.5rem;
-      margin-bottom: 1.5rem;
+    #success {
+      text-align: center;
+      color: #0f0;
+      display: none;
+      margin-top: 1rem;
     }
   </style>
 </head>
 <body>
-  <h1>📝 Submit Show Update</h1>
-  <form action="https://formspree.io/f/xovlwbyo" method="POST">
-    <label for="showId">Select Your Show</label>
-    <select id="showId" name="Show ID" required>
+  <h1>📋 Submit Show Updates</h1>
+
+  <form id="updateForm">
+    <label for="show">Select Your Show</label>
+    <select id="show" name="showId" required>
       <option value="">Loading...</option>
     </select>
 
-    <label for="showName">Change Show Name</label>
-    <input type="text" name="Show Name Change" id="showName" placeholder="New show name" />
+    <label for="date">Show Date</label>
+    <input type="text" id="date" name="showDate" readonly />
 
-    <label for="djName">Change DJ Name</label>
-    <input type="text" name="DJ Name Change" id="djName" placeholder="New DJ name" />
+    <label for="guest">Add Guest</label>
+    <input type="text" id="guest" name="addGuest" placeholder="e.g. DJ X" />
 
-    <label for="guests">Add / Change Guests</label>
-    <textarea name="Guest Updates" id="guests" placeholder="e.g. Guest DJ, MC" rows="3"></textarea>
+    <label for="mc">Add MC</label>
+    <input type="text" id="mc" name="addMC" placeholder="e.g. MC Y" />
 
-    <button type="submit">Submit Update</button>
+    <label for="showName">Show Name Change?</label>
+    <input type="text" id="showName" name="showNameChange" placeholder="New show name" />
+
+    <label for="djName">DJ Name Change?</label>
+    <input type="text" id="djName" name="djNameChange" placeholder="New DJ name" />
+
+    <button type="submit">Submit</button>
   </form>
+
+  <div id="success">✅ Update submitted!</div>
 
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script>
-    const showDropdown = document.getElementById('showId');
-    const csvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTavGvSojxM1vYpMv0FSoC-WzIK3IqTYPNl1SYbya4iV8VJUaEmHso7yghmGQPLJvwpsEMzKjbonPDz/pub?output=csv';
+    const sheetCSV = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTavGvSojxM1vYpMv0FSoC-WzIK3IqTYPNl1SYbya4iV8VJUaEmHso7yghmGQPLJvwpsEMzKjbonPDz/pub?output=csv';
+    const scriptURL = 'https://script.google.com/macros/s/AKfycby0A5n91-Z_XQtwg46C_bertSdi-RMw7teLWXmx7TNxbbyJh17_gK4R-X2ycaBuVu_0/exec';
 
-    Papa.parse(csvUrl, {
+    const showSelect = document.getElementById('show');
+    const dateInput = document.getElementById('date');
+    const form = document.getElementById('updateForm');
+    const successMsg = document.getElementById('success');
+
+    let showMap = {};
+
+    Papa.parse(sheetCSV, {
       download: true,
       header: true,
-      complete: function(results) {
-        const added = new Set();
+      complete: (results) => {
         results.data.forEach(row => {
-          const showId = row['Show ID'];
-          const djName = row['DJ'];
-          if (showId && djName && !added.has(showId)) {
-            added.add(showId);
-            const option = document.createElement('option');
-            option.value = showId;
-            option.textContent = djName;
-            showDropdown.appendChild(option);
+          if (row['Show ID'] && row['DJ']) {
+            const opt = document.createElement('option');
+            opt.value = row['Show ID'];
+            opt.textContent = row['DJ'];
+            showMap[row['Show ID']] = row['Show Date'];
+            showSelect.appendChild(opt);
           }
         });
-        showDropdown.options[0].text = '-- Select Show --';
-      },
-      error: function(err) {
-        console.error('CSV load failed', err);
-        showDropdown.innerHTML = '<option value="">Failed to load</option>';
+        showSelect.options[0].text = '-- Select --';
       }
+    });
+
+    showSelect.addEventListener('change', () => {
+      const selectedID = showSelect.value;
+      dateInput.value = showMap[selectedID] || '';
+    });
+
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      const formData = new FormData(form);
+      formData.append('timestamp', new Date().toISOString());
+
+      fetch(scriptURL, {
+        method: 'POST',
+        body: formData,
+      })
+      .then(res => res.text())
+      .then(response => {
+        form.reset();
+        dateInput.value = '';
+        successMsg.style.display = 'block';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      })
+      .catch(err => {
+        alert('❌ Failed to submit. Try again later.');
+        console.error(err);
+      });
     });
   </script>
 </body>
