@@ -57,6 +57,7 @@
       display: none;
     }
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 </head>
 <body>
   <h1>🎛️ Submit Show Changes</h1>
@@ -101,15 +102,17 @@
     const csvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTavGvSojxM1vYpMv0FSoC-WzIK3IqTYPNl1SYbya4iV8VJUaEmHso7yghmGQPLJvwpsEMzKjbonPDz/pub?output=csv';
     const scriptUrl = 'https://script.google.com/macros/s/AKfycbxHZ1MtV2323U9oQ9lRJPExbdlvf-XXe6CTPvkUvAwZHyVi2zzMxpu7aimMMoShjR-e/exec';
 
-    fetch(csvUrl)
-      .then(res => res.text())
-      .then(csv => {
-        const lines = csv.split('\n').slice(1);
+    Papa.parse(csvUrl, {
+      download: true,
+      header: true,
+      complete: function(results) {
+        const rows = results.data;
         const added = new Set();
-        lines.forEach(row => {
-          const cols = row.split(',');
-          const showID = cols[0]?.trim();
-          const djName = cols[1]?.trim();
+
+        rows.forEach(row => {
+          const showID = row['Show ID']?.trim();
+          const djName = row['DJ']?.trim();
+
           if (showID && djName && !added.has(showID)) {
             added.add(showID);
             const opt = document.createElement('option');
@@ -118,16 +121,18 @@
             showSelect.appendChild(opt);
           }
         });
+
         if (showSelect.options.length > 1) {
           showSelect.options[0].text = '-- Select --';
         } else {
           showSelect.options[0].text = 'No shows found';
         }
-      })
-      .catch(err => {
+      },
+      error: function(err) {
         showSelect.innerHTML = '<option value="">Error loading shows</option>';
         console.error('CSV load error:', err);
-      });
+      }
+    });
 
     form.addEventListener('submit', function(e) {
       e.preventDefault();
