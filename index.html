@@ -9,20 +9,16 @@
       background: #111;
       color: #fff;
       font-family: sans-serif;
-      margin: 0;
       padding: 2rem;
       max-width: 600px;
-      margin-inline: auto;
+      margin: auto;
     }
     h1 {
       text-align: center;
       font-size: 1.8rem;
       margin-bottom: 2rem;
     }
-    label {
-      display: block;
-      margin: 1rem 0 0.3rem;
-    }
+    label { display: block; margin: 1rem 0 0.3rem; }
     input, select, textarea {
       width: 100%;
       padding: 0.75rem;
@@ -30,14 +26,6 @@
       border: none;
       border-radius: 6px;
       margin-bottom: 1rem;
-    }
-    small {
-      font-size: 0.85rem;
-      color: #aaa;
-    }
-    a {
-      color: #fff;
-      text-decoration: underline;
     }
     button {
       background: #fff;
@@ -56,12 +44,6 @@
       color: #0f0;
       display: none;
     }
-    #extra-fields {
-      display: none;
-      margin-top: 2rem;
-      border-top: 1px solid #444;
-      padding-top: 1.5rem;
-    }
   </style>
 </head>
 <body>
@@ -73,95 +55,81 @@
       <option value="">Loading shows...</option>
     </select>
 
-    <label for="art">
-      Upload Artwork
-      <small>Or use the <a href="https://dj-artwork3-38cz.vercel.app/" target="_blank">Artwork Generator</a> to create artwork for SoundCloud.</small>
-    </label>
+    <label for="art">Upload Artwork</label>
     <input type="file" id="art" name="art" accept="image/*" />
 
-    <button type="button" id="showExtra">Update Show Info</button>
+    <label for="showName">Change Show Name</label>
+    <input type="text" id="showName" name="showName" placeholder="New show name" />
 
-    <div id="extra-fields">
-      <label for="showName">Change Show Name</label>
-      <input type="text" id="showName" name="showName" placeholder="New show name" />
+    <label for="guests">Add Guest(s)</label>
+    <input type="text" id="guests" name="guests" placeholder="e.g. Guest DJ, MC X" />
 
-      <label for="guests">Add Guest(s)</label>
-      <input type="text" id="guests" name="guests" placeholder="e.g. Guest DJ, MC X" />
+    <label for="cancel">Cancel this show?</label>
+    <select name="cancel" id="cancel">
+      <option value="">No</option>
+      <option value="Yes">Yes – Cancel this show</option>
+    </select>
 
-      <label for="cancel">Cancel this show?</label>
-      <select name="cancel" id="cancel">
-        <option value="">No</option>
-        <option value="Yes">Yes – Cancel this show</option>
-      </select>
+    <label for="timeChange">Request Time Change</label>
+    <input type="text" id="timeChange" name="timeChange" placeholder="e.g. Can I move to Thursday?" />
 
-      <label for="timeChange">Request Time Change</label>
-      <input type="text" id="timeChange" name="timeChange" placeholder="e.g. Can I move to Thursday?" />
-
-      <button type="submit">Submit Changes</button>
-    </div>
+    <button type="submit">Submit Changes</button>
   </form>
 
   <div id="success">✅ Your update has been submitted!</div>
 
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script>
-    const showSelect = document.getElementById('show');
-    const form = document.getElementById('updateForm');
-    const successMsg = document.getElementById('success');
-    const extraFields = document.getElementById('extra-fields');
-    const showExtraBtn = document.getElementById('showExtra');
-    const scriptUrl = 'https://script.google.com/macros/s/AKfycbxHZ1MtV2323U9oQ9lRJPExbdlvf-XXe6CTPvkUvAwZHyVi2zzMxpu7aimMMoShjR-e/exec';
     const csvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTavGvSojxM1vYpMv0FSoC-WzIK3IqTYPNl1SYbya4iV8VJUaEmHso7yghmGQPLJvwpsEMzKjbonPDz/pub?output=csv';
+    const scriptUrl = 'https://script.google.com/macros/s/AKfycbxHZ1MtV2323U9oQ9lRJPExbdlvf-XXe6CTPvkUvAwZHyVi2zzMxpu7aimMMoShjR-e/exec';
 
-    showExtraBtn.addEventListener('click', () => {
-      extraFields.style.display = 'block';
-      showExtraBtn.style.display = 'none';
-    });
+    const form = document.getElementById('updateForm');
+    const showSelect = document.getElementById('show');
+    const artInput = document.getElementById('art');
+    const successMsg = document.getElementById('success');
+
+    let base64Image = "";
 
     Papa.parse(csvUrl, {
       download: true,
       header: true,
-      complete: (results) => {
-        const added = new Set();
+      complete: function(results) {
+        showSelect.innerHTML = '<option value="">-- Select --</option>';
+        const seen = new Set();
         results.data.forEach(row => {
-          const showID = row["Show ID"]?.trim();
-          const djName = row["DJ"]?.trim();
-          if (showID && djName && !added.has(showID)) {
-            added.add(showID);
+          if (row['Show ID'] && row['DJ'] && !seen.has(row['Show ID'])) {
             const opt = document.createElement('option');
-            opt.value = showID;
-            opt.textContent = djName;
+            opt.value = row['Show ID'];
+            opt.textContent = row['DJ'];
             showSelect.appendChild(opt);
+            seen.add(row['Show ID']);
           }
         });
-        if (showSelect.options.length > 1) {
-          showSelect.options[0].text = '-- Select --';
-        } else {
-          showSelect.options[0].text = 'No shows found';
-        }
-      },
-      error: (err) => {
-        showSelect.innerHTML = '<option value="">Error loading shows</option>';
-        console.error('CSV load error:', err);
       }
     });
 
-    form.addEventListener('submit', async (e) => {
+    artInput.addEventListener("change", function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onloadend = function() {
+        base64Image = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    form.addEventListener('submit', function(e) {
       e.preventDefault();
+
       const formData = new FormData(form);
       const params = new URLSearchParams();
 
       for (const [key, value] of formData.entries()) {
-        if (key !== 'art') {
-          params.append(key, value);
-        }
+        params.append(key, value);
       }
 
-      const fileInput = document.getElementById('art');
-      const file = fileInput.files[0];
-      if (file) {
-        const base64 = await toBase64(file);
-        params.append('artData', base64);
+      if (base64Image) {
+        params.append('artData', base64Image);
       }
 
       fetch(scriptUrl, {
@@ -171,26 +139,16 @@
       .then(res => res.text())
       .then(text => {
         form.reset();
+        base64Image = "";
         successMsg.style.display = 'block';
-        extraFields.style.display = 'none';
-        showExtraBtn.style.display = 'block';
         window.scrollTo({ top: 0, behavior: 'smooth' });
-        console.log('Submitted to Google Apps Script:', text);
+        console.log(text);
       })
       .catch(err => {
         alert('❌ Failed to submit. Try again later.');
-        console.error('Submission error:', err);
+        console.error(err);
       });
     });
-
-    function toBase64(file) {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-    }
   </script>
 </body>
 </html>
