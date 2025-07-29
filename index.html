@@ -4,7 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Submit Show Changes – Mesh Radio</title>
-  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <style>
     body {
       background: #111;
@@ -57,6 +56,45 @@
       color: #0f0;
       display: none;
     }
+    #artworkSection, #moreFields {
+      display: none;
+      transition: all 0.3s ease;
+    }
+    #artworkPopup {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: #000d;
+      z-index: 9999;
+      padding: 2rem;
+    }
+    #artworkPopup iframe {
+      width: 100%;
+      height: 100%;
+      border: 0;
+    }
+    #artworkPopup div {
+      position: relative;
+      max-width: 1000px;
+      height: 90vh;
+      margin: auto;
+      background: #111;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    #artworkPopup button {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 9999;
+      background: #fff;
+      color: #000;
+      border: none;
+      padding: 0.5rem 1rem;
+      font-size: 1rem;
+      cursor: pointer;
+      border-radius: 6px;
+    }
   </style>
 </head>
 <body>
@@ -68,36 +106,52 @@
       <option value="">Loading shows...</option>
     </select>
 
-    <label for="art">
-      Artwork filename or URL
-      <small>Use the <a href="https://dj-artwork3-38cz.vercel.app/" target="_blank">Artwork Generator</a> and paste the file name here.</small>
-    </label>
-    <input type="text" id="art" name="art" placeholder="e.g. mesh-show.jpg" />
+    <div id="artworkSection">
+      <label for="art">
+        Artwork filename or URL
+        <small><a href="#" onclick="openPopup()">Launch the Artwork Generator</a> and paste the file name here after export.</small>
+      </label>
+      <input type="text" id="art" name="art" placeholder="e.g. mesh-show.jpg" />
 
-    <label for="showName">Change Show Name</label>
-    <input type="text" id="showName" name="showName" placeholder="New show name" />
+      <button type="button" onclick="revealMore()">Update Show Info</button>
+    </div>
 
-    <label for="guests">Add Guest(s)</label>
-    <input type="text" id="guests" name="guests" placeholder="e.g. Guest DJ, MC X" />
+    <div id="moreFields">
+      <label for="showName">Change Show Name</label>
+      <input type="text" id="showName" name="showName" placeholder="New show name" />
 
-    <label for="cancel">Cancel this show?</label>
-    <select name="cancel" id="cancel">
-      <option value="">No</option>
-      <option value="Yes">Yes – Cancel this show</option>
-    </select>
+      <label for="guests">Add Guest(s)</label>
+      <input type="text" id="guests" name="guests" placeholder="e.g. Guest DJ, MC X" />
 
-    <label for="timeChange">Request Time Change</label>
-    <input type="text" id="timeChange" name="timeChange" placeholder="e.g. Can I move to Thursday?" />
+      <label for="cancel">Cancel this show?</label>
+      <select name="cancel" id="cancel">
+        <option value="">No</option>
+        <option value="Yes">Yes – Cancel this show</option>
+      </select>
 
-    <button type="submit">Submit Changes</button>
+      <label for="timeChange">Request Time Change</label>
+      <input type="text" id="timeChange" name="timeChange" placeholder="e.g. Can I move to Thursday?" />
+
+      <button type="submit">Submit Changes</button>
+    </div>
   </form>
 
   <div id="success">✅ Your update has been submitted!</div>
 
+  <div id="artworkPopup">
+    <div>
+      <button onclick="closePopup()">Close</button>
+      <iframe src="https://dj-artwork3-38cz.vercel.app/"></iframe>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script>
     const showSelect = document.getElementById('show');
     const form = document.getElementById('updateForm');
     const successMsg = document.getElementById('success');
+    const artworkSection = document.getElementById('artworkSection');
+    const moreFields = document.getElementById('moreFields');
 
     const csvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTavGvSojxM1vYpMv0FSoC-WzIK3IqTYPNl1SYbya4iV8VJUaEmHso7yghmGQPLJvwpsEMzKjbonPDz/pub?output=csv';
     const scriptUrl = 'https://script.google.com/macros/s/AKfycbxHZ1MtV2323U9oQ9lRJPExbdlvf-XXe6CTPvkUvAwZHyVi2zzMxpu7aimMMoShjR-e/exec';
@@ -108,33 +162,44 @@
       complete: function(results) {
         const rows = results.data;
         const added = new Set();
-
-        console.log("📋 Parsed CSV rows:", rows);
-
         rows.forEach(row => {
           const showID = row['Show ID']?.trim();
-          const djName = row['DJ']?.trim();
-
-          if (showID && djName && !added.has(showID)) {
+          const dj = row['DJ']?.trim();
+          if (showID && dj && !added.has(showID)) {
             added.add(showID);
             const opt = document.createElement('option');
             opt.value = showID;
-            opt.textContent = djName;
+            opt.textContent = dj;
             showSelect.appendChild(opt);
           }
         });
-
-        if (showSelect.options.length > 1) {
-          showSelect.options[0].text = '-- Select --';
-        } else {
-          showSelect.options[0].text = 'No shows found';
-        }
+        showSelect.options[0].text = '-- Select --';
       },
       error: function(err) {
+        console.error('CSV load error:', err);
         showSelect.innerHTML = '<option value="">Error loading shows</option>';
-        console.error('PapaParse error:', err);
       }
     });
+
+    showSelect.addEventListener('change', () => {
+      if (showSelect.value) {
+        artworkSection.style.display = 'block';
+      } else {
+        artworkSection.style.display = 'none';
+        moreFields.style.display = 'none';
+      }
+    });
+
+    function revealMore() {
+      moreFields.style.display = 'block';
+    }
+
+    function openPopup() {
+      document.getElementById('artworkPopup').style.display = 'block';
+    }
+    function closePopup() {
+      document.getElementById('artworkPopup').style.display = 'none';
+    }
 
     form.addEventListener('submit', function(e) {
       e.preventDefault();
@@ -152,8 +217,10 @@
       .then(text => {
         form.reset();
         successMsg.style.display = 'block';
+        artworkSection.style.display = 'none';
+        moreFields.style.display = 'none';
         window.scrollTo({ top: 0, behavior: 'smooth' });
-        console.log('✅ Apps Script response:', text);
+        console.log('Response from Apps Script:', text);
       })
       .catch(err => {
         alert('❌ Failed to submit. Try again later.');
