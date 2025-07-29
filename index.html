@@ -3,127 +3,128 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Upload Show Art – Mesh Radio</title>
+  <title>Upload Show Artwork – Mesh Radio</title>
   <style>
     body {
       background: #111;
       color: #fff;
       font-family: sans-serif;
-      padding: 2rem;
-      max-width: 600px;
-      margin: auto;
-    }
-    h1 {
-      text-align: center;
+      max-width: 500px;
+      margin: 2rem auto;
+      padding: 1rem;
     }
     label {
+      margin-top: 1rem;
       display: block;
-      margin: 1rem 0 0.3rem;
     }
-    select, input[type="file"] {
+    input, select, button {
       width: 100%;
       padding: 0.75rem;
+      font-size: 1rem;
+      margin-top: 0.5rem;
+      margin-bottom: 1rem;
       border-radius: 6px;
       border: none;
-      margin-bottom: 1rem;
-      font-size: 1rem;
     }
     button {
-      padding: 1rem 1.5rem;
       background: #fff;
       color: #000;
-      border: none;
-      border-radius: 8px;
-      font-size: 1rem;
+      font-weight: bold;
       cursor: pointer;
-      display: block;
-      margin: 2rem auto 0;
     }
     #success {
-      text-align: center;
-      color: lime;
-      margin-top: 1.5rem;
+      color: #0f0;
+      font-weight: bold;
+      margin-top: 1rem;
       display: none;
+      text-align: center;
     }
   </style>
 </head>
 <body>
 
-  <h1>🎨 Upload Show Artwork</h1>
+  <h1>📤 Upload Show Artwork</h1>
 
   <form id="uploadForm">
-    <label for="show">Choose your show</label>
-    <select name="show" id="show" required>
-      <option value="">Loading shows...</option>
+    <label for="show">Select your show</label>
+    <select id="show" name="show" required>
+      <option value="">Loading...</option>
     </select>
 
-    <label for="art">Select your artwork image</label>
+    <label for="dj">Your DJ Name</label>
+    <input type="text" id="dj" name="dj" placeholder="e.g. Noah R" required />
+
+    <label for="art">Upload your artwork</label>
     <input type="file" id="art" name="art" accept="image/*" required />
 
-    <button type="submit">Upload</button>
+    <button type="submit">Upload to Mesh</button>
   </form>
 
-  <div id="success">✅ Image uploaded and linked successfully!</div>
+  <div id="success">✅ Uploaded successfully!</div>
 
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script>
-    const sheetUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTavGvSojxM1vYpMv0FSoC-WzIK3IqTYPNl1SYbya4iV8VJUaEmHso7yghmGQPLJvwpsEMzKjbonPDz/pub?output=csv';
-    const uploadUrl = 'https://script.google.com/macros/s/AKfycbwpvIeXKPbwW-kB3JzxmxG-cmYpQIGXnoHKxe8OBILqBiF3GfRnrZitopxAsmC9uGvCbQ/exec';
+    const csvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTavGvSojxM1vYpMv0FSoC-WzIK3IqTYPNl1SYbya4iV8VJUaEmHso7yghmGQPLJvwpsEMzKjbonPDz/pub?output=csv';
+    const scriptUrl = 'https://script.google.com/macros/s/AKfycbwpvIeXKPbwW-kB3JzxmxG-cmYpQIGXnoHKxe8OBILqBiF3GfRnrZitopxAsmC9uGvCbQ/exec';
 
     const showSelect = document.getElementById('show');
     const form = document.getElementById('uploadForm');
     const successMsg = document.getElementById('success');
 
-    // Load Show list
-    Papa.parse(sheetUrl, {
-      download: true,
-      header: true,
-      complete: function(results) {
-        const data = results.data;
-        showSelect.innerHTML = '<option value="">-- Select --</option>';
-        data.forEach(row => {
+    // Populate show dropdown from CSV
+    fetch(csvUrl)
+      .then(res => res.text())
+      .then(csv => {
+        const parsed = Papa.parse(csv, { header: true });
+        parsed.data.forEach(row => {
           if (row['Show ID'] && row['DJ']) {
             const opt = document.createElement('option');
             opt.value = row['Show ID'];
             opt.textContent = row['DJ'];
-            opt.dataset.dj = row['DJ'];
             showSelect.appendChild(opt);
           }
         });
-      }
-    });
+        showSelect.options[0].text = '-- Select --';
+      });
 
-    form.addEventListener('submit', async function(e) {
+    // Handle upload
+    form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const showId = showSelect.value;
-      const djName = showSelect.options[showSelect.selectedIndex].textContent;
+
+      const showId = document.getElementById('show').value;
+      const dj = document.getElementById('dj').value;
       const fileInput = document.getElementById('art');
       const file = fileInput.files[0];
-      if (!showId || !file) return;
 
-      const formData = new FormData();
-      formData.append('showId', showId);
-      formData.append('dj', djName);
-      formData.append('art', file);
+      if (!file) return alert('Please select a file.');
 
-      try {
-        const res = await fetch(uploadUrl, {
-          method: 'POST',
-          body: formData,
-        });
-        const text = await res.text();
-        if (text.includes('✅')) {
+      const reader = new FileReader();
+      reader.onload = async function () {
+        const base64 = reader.result.split(',')[1];
+
+        const body = new URLSearchParams();
+        body.append('showId', showId);
+        body.append('dj', dj);
+        body.append('file', base64);
+        body.append('filename', file.name);
+
+        try {
+          const res = await fetch(scriptUrl, {
+            method: 'POST',
+            body,
+          });
+          const text = await res.text();
+          console.log('Server response:', text);
           successMsg.style.display = 'block';
           form.reset();
-        } else {
-          alert('Upload failed: ' + text);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        } catch (err) {
+          console.error(err);
+          alert('Upload failed.');
         }
-      } catch (err) {
-        alert('❌ Upload failed. Check the console.');
-        console.error(err);
-      }
+      };
+      reader.readAsDataURL(file);
     });
   </script>
-
 </body>
 </html>
