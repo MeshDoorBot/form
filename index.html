@@ -15,33 +15,34 @@
     }
     h1 {
       text-align: center;
-      font-size: 1.8rem;
-      margin-bottom: 2rem;
     }
-    label { display: block; margin: 1rem 0 0.3rem; }
-    input, select, textarea {
+    label {
+      margin-top: 1rem;
+      display: block;
+    }
+    input, select, textarea, button {
       width: 100%;
       padding: 0.75rem;
+      margin-top: 0.25rem;
       font-size: 1rem;
-      border: none;
       border-radius: 6px;
-      margin-bottom: 1rem;
+      border: none;
+      box-sizing: border-box;
     }
     button {
       background: #fff;
       color: #000;
-      border: none;
-      padding: 1rem 1.5rem;
-      font-size: 1rem;
-      border-radius: 8px;
+      margin-top: 2rem;
       cursor: pointer;
-      display: block;
-      margin: 2rem auto 0;
+    }
+    small {
+      color: #aaa;
+      font-size: 0.9rem;
     }
     #success {
-      text-align: center;
-      margin-top: 2rem;
+      margin-top: 1.5rem;
       color: #0f0;
+      text-align: center;
       display: none;
     }
   </style>
@@ -55,7 +56,7 @@
       <option value="">Loading shows...</option>
     </select>
 
-    <label for="art">Upload Artwork</label>
+    <label for="art">Upload Artwork <small>(or use the <a href="https://dj-artwork3-38cz.vercel.app/" target="_blank">Artwork Generator</a>)</small></label>
     <input type="file" id="art" name="art" accept="image/*" />
 
     <label for="showName">Change Show Name</label>
@@ -74,80 +75,95 @@
     <input type="text" id="timeChange" name="timeChange" placeholder="e.g. Can I move to Thursday?" />
 
     <button type="submit">Submit Changes</button>
+    <div id="success">✅ Your update has been submitted!</div>
   </form>
-
-  <div id="success">✅ Your update has been submitted!</div>
 
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script>
-    const csvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTavGvSojxM1vYpMv0FSoC-WzIK3IqTYPNl1SYbya4iV8VJUaEmHso7yghmGQPLJvwpsEMzKjbonPDz/pub?output=csv';
-    const scriptUrl = 'https://script.google.com/macros/s/AKfycbxHZ1MtV2323U9oQ9lRJPExbdlvf-XXe6CTPvkUvAwZHyVi2zzMxpu7aimMMoShjR-e/exec';
-
-    const form = document.getElementById('updateForm');
     const showSelect = document.getElementById('show');
-    const artInput = document.getElementById('art');
+    const form = document.getElementById('updateForm');
     const successMsg = document.getElementById('success');
+    const scriptUrl = 'https://script.google.com/macros/s/AKfycbxHZ1MtV2323U9oQ9lRJPExbdlvf-XXe6CTPvkUvAwZHyVi2zzMxpu7aimMMoShjR-e/exec';
+    const csvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTavGvSojxM1vYpMv0FSoC-WzIK3IqTYPNl1SYbya4iV8VJUaEmHso7yghmGQPLJvwpsEMzKjbonPDz/pub?output=csv';
 
-    let base64Image = "";
-
+    // Populate dropdown
     Papa.parse(csvUrl, {
       download: true,
       header: true,
-      complete: function(results) {
-        showSelect.innerHTML = '<option value="">-- Select --</option>';
-        const seen = new Set();
+      complete: (results) => {
+        const added = new Set();
         results.data.forEach(row => {
-          if (row['Show ID'] && row['DJ'] && !seen.has(row['Show ID'])) {
+          const showID = row['Show ID']?.trim();
+          const djName = row['DJ']?.trim();
+          if (showID && djName && !added.has(showID)) {
             const opt = document.createElement('option');
-            opt.value = row['Show ID'];
-            opt.textContent = row['DJ'];
+            opt.value = showID;
+            opt.dataset.dj = djName;
+            opt.textContent = djName;
             showSelect.appendChild(opt);
-            seen.add(row['Show ID']);
+            added.add(showID);
           }
         });
+        showSelect.options[0].text = '-- Select --';
+      },
+      error: (err) => {
+        showSelect.innerHTML = '<option>Error loading shows</option>';
+        console.error(err);
       }
     });
 
-    artInput.addEventListener("change", function(e) {
-      const file = e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onloadend = function() {
-        base64Image = reader.result;
-      };
-      reader.readAsDataURL(file);
-    });
-
-    form.addEventListener('submit', function(e) {
+    form.addEventListener('submit', async function(e) {
       e.preventDefault();
-
       const formData = new FormData(form);
       const params = new URLSearchParams();
 
-      for (const [key, value] of formData.entries()) {
-        params.append(key, value);
-      }
+      // Add dropdown value and attached DJ name
+      const selectedOption = showSelect.options[showSelect.selectedIndex];
+      params.append('show', selectedOption.value);
+      params.append('dj', selectedOption.dataset.dj);
 
-      if (base64Image) {
-        params.append('artData', base64Image);
-      }
+      // Add text inputs
+      ['showName', 'guests', 'cancel', 'timeChange'].forEach(key => {
+        params.append(key, formData.get(key) || '');
+      });
 
-      fetch(scriptUrl, {
-        method: 'POST',
-        body: params
-      })
-      .then(res => res.text())
-      .then(text => {
+      // Convert image file to base64
+      const file = formData.get('art');
+      if (file && file.name) {
+        const reader = new FileReader();
+        reader.onload = async function() {
+          const base64Data = reader.result;
+          params.append('artData', base64Data);
+
+          // Send POST
+          try {
+            const res = await fetch(scriptUrl, {
+              method: 'POST',
+              body: params,
+            });
+            const text = await res.text();
+            console.log('✅ Response:', text);
+            form.reset();
+            successMsg.style.display = 'block';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          } catch (err) {
+            alert('❌ Failed to submit');
+            console.error(err);
+          }
+        };
+        reader.readAsDataURL(file);
+      } else {
+        // No file uploaded, still submit
+        const res = await fetch(scriptUrl, {
+          method: 'POST',
+          body: params,
+        });
+        const text = await res.text();
+        console.log('✅ Response:', text);
         form.reset();
-        base64Image = "";
         successMsg.style.display = 'block';
         window.scrollTo({ top: 0, behavior: 'smooth' });
-        console.log(text);
-      })
-      .catch(err => {
-        alert('❌ Failed to submit. Try again later.');
-        console.error(err);
-      });
+      }
     });
   </script>
 </body>
