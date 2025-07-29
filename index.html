@@ -2,173 +2,142 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Submit Show Changes – Mesh Radio</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mesh Radio – Submit Show Update</title>
   <style>
     body {
       background: #111;
       color: #fff;
       font-family: sans-serif;
-      margin: 0;
       padding: 2rem;
       max-width: 600px;
-      margin-inline: auto;
+      margin: auto;
     }
     h1 {
       text-align: center;
-      font-size: 1.8rem;
-      margin-bottom: 2rem;
+      font-size: 1.75rem;
     }
     label {
       display: block;
-      margin: 1rem 0 0.3rem;
+      margin: 1.2rem 0 0.4rem;
     }
     input, select, textarea {
       width: 100%;
       padding: 0.75rem;
-      font-size: 1rem;
-      border: none;
       border-radius: 6px;
-      margin-bottom: 1rem;
-    }
-    small {
-      font-size: 0.85rem;
-      color: #aaa;
-    }
-    a {
-      color: #fff;
-      text-decoration: underline;
+      border: none;
+      font-size: 1rem;
     }
     button {
+      margin-top: 2rem;
+      padding: 1rem;
+      width: 100%;
       background: #fff;
       color: #000;
       border: none;
-      padding: 1rem 1.5rem;
       font-size: 1rem;
       border-radius: 8px;
       cursor: pointer;
-      display: block;
-      margin: 2rem auto 0;
     }
     #success {
       text-align: center;
-      margin-top: 2rem;
+      margin-top: 1.5rem;
       color: #0f0;
       display: none;
     }
   </style>
 </head>
 <body>
-  <h1>🎛️ Submit Show Changes</h1>
-
+  <h1>🎛 Submit Show Changes</h1>
   <form id="updateForm">
     <label for="show">Select your show</label>
-    <select name="show" id="show" required>
-      <option value="">Loading shows...</option>
+    <select id="show" name="show" required>
+      <option value="">Loading...</option>
     </select>
 
-    <label for="dj">DJ Name</label>
-    <input type="text" id="dj" name="dj" placeholder="Your DJ name" required />
-
-    <label for="art">Upload Artwork (jpg/png)</label>
-    <input type="file" id="art" name="art" accept="image/*" />
+    <label for="art">Upload Artwork</label>
+    <input type="file" name="art" id="art" accept="image/*" required />
 
     <label for="showName">Change Show Name</label>
-    <input type="text" id="showName" name="showName" placeholder="New show name" />
+    <input type="text" name="showName" id="showName" />
 
-    <label for="guests">Add Guest(s)</label>
-    <input type="text" id="guests" name="guests" placeholder="e.g. Guest DJ, MC X" />
+    <label for="guests">Guest(s)</label>
+    <input type="text" name="guests" id="guests" />
 
     <label for="cancel">Cancel this show?</label>
     <select name="cancel" id="cancel">
       <option value="">No</option>
-      <option value="Yes">Yes – Cancel this show</option>
+      <option value="Yes">Yes</option>
     </select>
 
-    <label for="timeChange">Request Time Change</label>
-    <input type="text" id="timeChange" name="timeChange" placeholder="e.g. Can I move to Thursday?" />
+    <label for="timeChange">Time Change Request</label>
+    <input type="text" name="timeChange" id="timeChange" />
 
-    <button type="submit">Submit Changes</button>
+    <button type="submit">Submit Update</button>
   </form>
 
-  <div id="success">✅ Your update has been submitted!</div>
+  <div id="success">✅ Submitted successfully!</div>
 
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script>
     const showSelect = document.getElementById('show');
     const form = document.getElementById('updateForm');
-    const successMsg = document.getElementById('success');
-    const csvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTavGvSojxM1vYpMv0FSoC-WzIK3IqTYPNl1SYbya4iV8VJUaEmHso7yghmGQPLJvwpsEMzKjbonPDz/pub?output=csv';
-    const scriptUrl = 'https://script.google.com/macros/s/AKfycbxHZ1MtV2323U9oQ9lRJPExbdlvf-XXe6CTPvkUvAwZHyVi2zzMxpu7aimMMoShjR-e/exec';
+    const successDiv = document.getElementById('success');
+    const scriptURL = 'https://script.google.com/macros/s/AKfycbxHZ1MtV2323U9oQ9lRJPExbdlvf-XXe6CTPvkUvAwZHyVi2zzMxpu7aimMMoShjR-e/exec';
+    const csvURL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTavGvSojxM1vYpMv0FSoC-WzIK3IqTYPNl1SYbya4iV8VJUaEmHso7yghmGQPLJvwpsEMzKjbonPDz/pub?output=csv';
 
-    Papa.parse(csvUrl, {
-      download: true,
-      header: true,
-      complete: function(results) {
-        const data = results.data;
-        data.forEach(row => {
+    fetch(csvURL)
+      .then(res => res.text())
+      .then(csv => {
+        const parsed = Papa.parse(csv, { header: true });
+        parsed.data.forEach(row => {
           if (row['Show ID'] && row['DJ']) {
             const opt = document.createElement('option');
-            opt.value = row['Show ID'].trim();
-            opt.textContent = row['DJ'].trim();
+            opt.value = row['Show ID'];
+            opt.textContent = row['DJ'];
             showSelect.appendChild(opt);
           }
         });
-        if (showSelect.options.length > 1) {
-          showSelect.options[0].text = '-- Select --';
-        } else {
-          showSelect.options[0].text = 'No shows found';
-        }
-      }
-    });
-
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-
-      const formData = new FormData(form);
-      const plainData = {};
-      for (const [key, val] of formData.entries()) {
-        plainData[key] = val;
-      }
-
-      // Handle artwork file
-      const artFile = form.art.files[0];
-      if (artFile) {
-        const reader = new FileReader();
-        reader.onloadend = function () {
-          plainData.artData = reader.result;
-          submitData(plainData);
-        };
-        reader.readAsDataURL(artFile);
-      } else {
-        submitData(plainData);
-      }
-    });
-
-    function submitData(data) {
-      const params = new URLSearchParams();
-      for (const key in data) {
-        if (data[key]) {
-          params.append(key, data[key]);
-        }
-      }
-
-      fetch(scriptUrl, {
-        method: 'POST',
-        body: params
-      })
-      .then(res => res.text())
-      .then(text => {
-        document.getElementById('updateForm').reset();
-        successMsg.style.display = 'block';
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        console.log('✅ Submitted:', text);
-      })
-      .catch(err => {
-        alert('❌ Failed to submit. Try again later.');
-        console.error('Submission error:', err);
+        showSelect.options[0].text = '-- Select Show --';
       });
-    }
+
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+      const formData = new FormData();
+
+      const showId = document.getElementById('show').value;
+      const djText = document.getElementById('show').selectedOptions[0].text;
+      const file = document.getElementById('art').files[0];
+
+      formData.append('show', showId);
+      formData.append('dj', djText);
+      formData.append('showName', document.getElementById('showName').value);
+      formData.append('guests', document.getElementById('guests').value);
+      formData.append('cancel', document.getElementById('cancel').value);
+      formData.append('timeChange', document.getElementById('timeChange').value);
+
+      // Upload file first, then send rest of data
+      if (file) {
+        const upload = await fetch(scriptURL + '?upload=true', {
+          method: 'POST',
+          body: (() => { const f = new FormData(); f.append('file', file); return f })()
+        });
+        const driveLink = await upload.text();
+        formData.append('art', driveLink);
+      }
+
+      fetch(scriptURL, {
+        method: 'POST',
+        body: formData
+      }).then(res => res.text()).then(() => {
+        form.reset();
+        successDiv.style.display = 'block';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }).catch(err => {
+        alert('Error submitting form');
+        console.error(err);
+      });
+    });
   </script>
 </body>
 </html>
