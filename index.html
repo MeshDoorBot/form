@@ -3,80 +3,72 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Update Show – Mesh Radio</title>
+  <title>Mesh Radio – Update Your Show</title>
   <style>
     body {
       background: #111;
       color: #fff;
       font-family: sans-serif;
-      max-width: 600px;
+      max-width: 500px;
       margin: auto;
       padding: 2rem;
     }
     h1 {
       text-align: center;
+      font-size: 1.8rem;
       margin-bottom: 2rem;
     }
     label {
       display: block;
       margin: 1rem 0 0.4rem;
     }
-    input, select, textarea {
+    select, input, textarea, button {
       width: 100%;
       padding: 0.75rem;
       font-size: 1rem;
+      margin-bottom: 1rem;
       border-radius: 6px;
       border: none;
-      margin-bottom: 1rem;
+      box-sizing: border-box;
     }
     button {
-      width: 100%;
       background: #fff;
       color: #000;
-      padding: 1rem;
-      font-size: 1rem;
-      border-radius: 6px;
+      font-weight: bold;
       cursor: pointer;
     }
-    #success {
-      text-align: center;
-      margin-top: 1.5rem;
-      color: #0f0;
-      display: none;
+    .note {
+      font-size: 0.9rem;
+      color: #aaa;
+      margin-top: -0.5rem;
+      margin-bottom: 1.5rem;
     }
   </style>
 </head>
 <body>
-  <h1>🎧 Update Your Show</h1>
-
-  <form id="updateForm">
-    <label for="show">Select your show</label>
-    <select id="show" name="showId" required>
-      <option value="">Loading shows...</option>
+  <h1>📝 Submit Show Update</h1>
+  <form action="https://formspree.io/f/xovlwbyo" method="POST">
+    <label for="showId">Select Your Show</label>
+    <select id="showId" name="Show ID" required>
+      <option value="">Loading...</option>
     </select>
 
-    <label for="showNameChange">Show Name Change</label>
-    <input type="text" id="showNameChange" name="showNameChange" placeholder="Enter new show name" />
+    <label for="showName">Change Show Name</label>
+    <input type="text" name="Show Name Change" id="showName" placeholder="New show name" />
 
-    <label for="djNameChange">DJ Name Change</label>
-    <input type="text" id="djNameChange" name="djNameChange" placeholder="Enter new DJ name" />
+    <label for="djName">Change DJ Name</label>
+    <input type="text" name="DJ Name Change" id="djName" placeholder="New DJ name" />
 
-    <label for="guestUpdates">Guest Updates</label>
-    <input type="text" id="guestUpdates" name="guestUpdates" placeholder="Add guest info" />
+    <label for="guests">Add / Change Guests</label>
+    <textarea name="Guest Updates" id="guests" placeholder="e.g. Guest DJ, MC" rows="3"></textarea>
 
     <button type="submit">Submit Update</button>
   </form>
 
-  <div id="success">✅ Show updated successfully!</div>
-
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script>
+    const showDropdown = document.getElementById('showId');
     const csvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTavGvSojxM1vYpMv0FSoC-WzIK3IqTYPNl1SYbya4iV8VJUaEmHso7yghmGQPLJvwpsEMzKjbonPDz/pub?output=csv';
-    const scriptUrl = 'https://script.google.com/macros/s/AKfycby0A5n91-Z_XQtwg46C_bertSdi-RMw7teLWXmx7TNxbbyJh17_gK4R-X2ycaBuVu_0/exec';
-
-    const form = document.getElementById('updateForm');
-    const select = document.getElementById('show');
-    const success = document.getElementById('success');
 
     Papa.parse(csvUrl, {
       download: true,
@@ -85,41 +77,21 @@
         const added = new Set();
         results.data.forEach(row => {
           const showId = row['Show ID'];
-          const dj = row['DJ'];
-          if (showId && dj && !added.has(showId)) {
+          const djName = row['DJ'];
+          if (showId && djName && !added.has(showId)) {
+            added.add(showId);
             const option = document.createElement('option');
             option.value = showId;
-            option.textContent = dj;
-            select.appendChild(option);
-            added.add(showId);
+            option.textContent = djName;
+            showDropdown.appendChild(option);
           }
         });
-        select.options[0].text = '-- Select Show --';
+        showDropdown.options[0].text = '-- Select Show --';
+      },
+      error: function(err) {
+        console.error('CSV load failed', err);
+        showDropdown.innerHTML = '<option value="">Failed to load</option>';
       }
-    });
-
-    form.addEventListener('submit', e => {
-      e.preventDefault();
-      const formData = new FormData(form);
-      const data = new URLSearchParams();
-      for (const [key, val] of formData.entries()) {
-        data.append(key, val);
-      }
-
-      fetch(scriptUrl, {
-        method: 'POST',
-        body: data
-      })
-      .then(res => res.text())
-      .then(() => {
-        form.reset();
-        success.style.display = 'block';
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      })
-      .catch(err => {
-        alert('❌ Failed to submit.');
-        console.error(err);
-      });
     });
   </script>
 </body>
