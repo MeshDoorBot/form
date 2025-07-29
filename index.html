@@ -2,141 +2,113 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Mesh Radio – Submit Show Update</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Upload Show Artwork – Mesh Radio</title>
   <style>
     body {
       background: #111;
       color: #fff;
       font-family: sans-serif;
-      padding: 2rem;
-      max-width: 600px;
-      margin: auto;
-    }
-    h1 {
-      text-align: center;
-      font-size: 1.75rem;
+      max-width: 500px;
+      margin: 2rem auto;
+      padding: 1rem;
     }
     label {
       display: block;
-      margin: 1.2rem 0 0.4rem;
+      margin: 1rem 0 0.3rem;
     }
-    input, select, textarea {
+    select, input[type="file"], button {
       width: 100%;
       padding: 0.75rem;
-      border-radius: 6px;
-      border: none;
       font-size: 1rem;
+      border: none;
+      border-radius: 6px;
+      margin-bottom: 1rem;
     }
     button {
-      margin-top: 2rem;
-      padding: 1rem;
-      width: 100%;
       background: #fff;
       color: #000;
-      border: none;
-      font-size: 1rem;
-      border-radius: 8px;
+      font-weight: bold;
       cursor: pointer;
     }
     #success {
       text-align: center;
-      margin-top: 1.5rem;
       color: #0f0;
       display: none;
     }
   </style>
 </head>
 <body>
-  <h1>🎛 Submit Show Changes</h1>
-  <form id="updateForm">
+  <h1>🎨 Upload Show Artwork</h1>
+
+  <form id="uploadForm">
     <label for="show">Select your show</label>
-    <select id="show" name="show" required>
+    <select id="show" name="showId" required>
       <option value="">Loading...</option>
     </select>
 
-    <label for="art">Upload Artwork</label>
-    <input type="file" name="art" id="art" accept="image/*" required />
+    <label for="artwork">Choose your artwork</label>
+    <input type="file" id="artwork" name="artwork" accept="image/*" required />
 
-    <label for="showName">Change Show Name</label>
-    <input type="text" name="showName" id="showName" />
-
-    <label for="guests">Guest(s)</label>
-    <input type="text" name="guests" id="guests" />
-
-    <label for="cancel">Cancel this show?</label>
-    <select name="cancel" id="cancel">
-      <option value="">No</option>
-      <option value="Yes">Yes</option>
-    </select>
-
-    <label for="timeChange">Time Change Request</label>
-    <input type="text" name="timeChange" id="timeChange" />
-
-    <button type="submit">Submit Update</button>
+    <button type="submit">Upload</button>
   </form>
 
-  <div id="success">✅ Submitted successfully!</div>
+  <div id="success">✅ Uploaded successfully!</div>
 
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script>
+    const sheetURL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTavGvSojxM1vYpMv0FSoC-WzIK3IqTYPNl1SYbya4iV8VJUaEmHso7yghmGQPLJvwpsEMzKjbonPDz/pub?output=csv";
+    const form = document.getElementById('uploadForm');
     const showSelect = document.getElementById('show');
-    const form = document.getElementById('updateForm');
-    const successDiv = document.getElementById('success');
-    const scriptURL = 'https://script.google.com/macros/s/AKfycbxHZ1MtV2323U9oQ9lRJPExbdlvf-XXe6CTPvkUvAwZHyVi2zzMxpu7aimMMoShjR-e/exec';
-    const csvURL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTavGvSojxM1vYpMv0FSoC-WzIK3IqTYPNl1SYbya4iV8VJUaEmHso7yghmGQPLJvwpsEMzKjbonPDz/pub?output=csv';
+    const successMsg = document.getElementById('success');
 
-    fetch(csvURL)
+    // Load shows
+    fetch(sheetURL)
       .then(res => res.text())
       .then(csv => {
-        const parsed = Papa.parse(csv, { header: true });
-        parsed.data.forEach(row => {
-          if (row['Show ID'] && row['DJ']) {
+        const rows = Papa.parse(csv, { header: true }).data;
+        showSelect.innerHTML = '<option value="">-- Select Show --</option>';
+        rows.forEach(r => {
+          if (r["Show ID"] && r["DJ"]) {
             const opt = document.createElement('option');
-            opt.value = row['Show ID'];
-            opt.textContent = row['DJ'];
+            opt.value = r["Show ID"].trim();
+            opt.textContent = r["DJ"].trim();
+            opt.dataset.dj = r["DJ"].trim();
             showSelect.appendChild(opt);
           }
         });
-        showSelect.options[0].text = '-- Select Show --';
       });
 
-    form.addEventListener('submit', async e => {
+    // Upload
+    form.addEventListener("submit", async (e) => {
       e.preventDefault();
-      const formData = new FormData();
+      const showId = showSelect.value;
+      const dj = showSelect.options[showSelect.selectedIndex].dataset.dj;
+      const file = document.getElementById('artwork').files[0];
 
-      const showId = document.getElementById('show').value;
-      const djText = document.getElementById('show').selectedOptions[0].text;
-      const file = document.getElementById('art').files[0];
+      if (!showId || !file) return alert("Please select a show and a file.");
 
-      formData.append('show', showId);
-      formData.append('dj', djText);
-      formData.append('showName', document.getElementById('showName').value);
-      formData.append('guests', document.getElementById('guests').value);
-      formData.append('cancel', document.getElementById('cancel').value);
-      formData.append('timeChange', document.getElementById('timeChange').value);
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64String = reader.result.split(',')[1];
 
-      // Upload file first, then send rest of data
-      if (file) {
-        const upload = await fetch(scriptURL + '?upload=true', {
-          method: 'POST',
-          body: (() => { const f = new FormData(); f.append('file', file); return f })()
-        });
-        const driveLink = await upload.text();
-        formData.append('art', driveLink);
-      }
+        const body = new URLSearchParams();
+        body.append("showId", showId);
+        body.append("dj", dj);
+        body.append("file", base64String);
+        body.append("filename", file.name);
+        body.append("mimeType", file.type);
 
-      fetch(scriptURL, {
-        method: 'POST',
-        body: formData
-      }).then(res => res.text()).then(() => {
+        const scriptURL = "https://script.google.com/macros/s/AKfycbwpvIeXKPbwW-kB3JzxmxG-cmYpQIGXnoHKxe8OBILqBiF3GfRnrZitopxAsmC9uGvCbQ/exec";
+        const res = await fetch(scriptURL, { method: "POST", body });
+        const text = await res.text();
+        console.log(text);
+
+        successMsg.style.display = 'block';
         form.reset();
-        successDiv.style.display = 'block';
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      }).catch(err => {
-        alert('Error submitting form');
-        console.error(err);
-      });
+        showSelect.selectedIndex = 0;
+      };
+      reader.readAsDataURL(file);
     });
   </script>
 </body>
