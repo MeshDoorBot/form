@@ -50,51 +50,56 @@
       display: block;
       margin: 2rem auto 0;
     }
+    #success {
+      text-align: center;
+      margin-top: 2rem;
+      color: #0f0;
+      display: none;
+    }
   </style>
 </head>
 <body>
   <h1>🎛️ Submit Show Changes</h1>
 
-  <form action="https://script.google.com/macros/s/AKfycbxHZ1MtV2323U9oQ9lRJPExbdlvf-XXe6CTPvkUvAwZHyVi2zzMxpu7aimMMoShjR-e/exec" method="POST">
-    
-    <!-- Show selection -->
+  <form id="updateForm">
     <label for="show">Select your show</label>
     <select name="show" id="show" required>
       <option value="">Loading shows...</option>
     </select>
 
-    <!-- Artwork -->
     <label for="art">
       Artwork filename or URL
       <small>Use the <a href="https://dj-artwork3-38cz.vercel.app/" target="_blank">Artwork Generator</a> and paste the file name here.</small>
     </label>
     <input type="text" id="art" name="art" placeholder="e.g. mesh-show.jpg" />
 
-    <!-- Show name change -->
     <label for="showName">Change Show Name</label>
     <input type="text" id="showName" name="showName" placeholder="New show name" />
 
-    <!-- Guests -->
     <label for="guests">Add Guest(s)</label>
     <input type="text" id="guests" name="guests" placeholder="e.g. Guest DJ, MC X" />
 
-    <!-- Cancel -->
     <label for="cancel">Cancel this show?</label>
     <select name="cancel" id="cancel">
       <option value="">No</option>
       <option value="Yes">Yes – Cancel this show</option>
     </select>
 
-    <!-- Time change -->
     <label for="timeChange">Request Time Change</label>
     <input type="text" id="timeChange" name="timeChange" placeholder="e.g. Can I move to Thursday?" />
 
     <button type="submit">Submit Changes</button>
   </form>
 
+  <div id="success">✅ Your update has been submitted!</div>
+
   <script>
     const showSelect = document.getElementById('show');
+    const form = document.getElementById('updateForm');
+    const successMsg = document.getElementById('success');
+
     const csvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTavGvSojxM1vYpMv0FSoC-WzIK3IqTYPNl1SYbya4iV8VJUaEmHso7yghmGQPLJvwpsEMzKjbonPDz/pub?output=csv';
+    const scriptUrl = 'https://script.google.com/macros/s/AKfycbxHZ1MtV2323U9oQ9lRJPExbdlvf-XXe6CTPvkUvAwZHyVi2zzMxpu7aimMMoShjR-e/exec';
 
     fetch(csvUrl)
       .then(res => res.text())
@@ -103,8 +108,8 @@
         const added = new Set();
         lines.forEach(row => {
           const cols = row.split(',');
-          const showID = cols[0]?.trim(); // Column A: Show ID
-          const djName = cols[1]?.trim(); // Column B: DJ Name
+          const showID = cols[0]?.trim();
+          const djName = cols[1]?.trim();
           if (showID && djName && !added.has(showID)) {
             added.add(showID);
             const opt = document.createElement('option');
@@ -123,6 +128,31 @@
         showSelect.innerHTML = '<option value="">Error loading shows</option>';
         console.error('CSV load error:', err);
       });
+
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      const formData = new FormData(form);
+      const params = new URLSearchParams();
+      for (const [key, value] of formData.entries()) {
+        params.append(key, value);
+      }
+
+      fetch(scriptUrl, {
+        method: 'POST',
+        body: params,
+      })
+      .then(res => res.text())
+      .then(text => {
+        form.reset();
+        successMsg.style.display = 'block';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        console.log('Response from Apps Script:', text);
+      })
+      .catch(err => {
+        alert('❌ Failed to submit. Try again later.');
+        console.error('Submission error:', err);
+      });
+    });
   </script>
 </body>
 </html>
