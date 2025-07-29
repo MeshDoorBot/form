@@ -9,40 +9,51 @@
       background: #111;
       color: #fff;
       font-family: sans-serif;
+      margin: 0;
       padding: 2rem;
       max-width: 600px;
-      margin: auto;
+      margin-inline: auto;
     }
     h1 {
       text-align: center;
+      font-size: 1.8rem;
+      margin-bottom: 2rem;
     }
     label {
-      margin-top: 1rem;
       display: block;
+      margin: 1rem 0 0.3rem;
     }
-    input, select, textarea, button {
+    input, select, textarea {
       width: 100%;
       padding: 0.75rem;
-      margin-top: 0.25rem;
       font-size: 1rem;
-      border-radius: 6px;
       border: none;
-      box-sizing: border-box;
+      border-radius: 6px;
+      margin-bottom: 1rem;
+    }
+    small {
+      font-size: 0.85rem;
+      color: #aaa;
+    }
+    a {
+      color: #fff;
+      text-decoration: underline;
     }
     button {
       background: #fff;
       color: #000;
-      margin-top: 2rem;
+      border: none;
+      padding: 1rem 1.5rem;
+      font-size: 1rem;
+      border-radius: 8px;
       cursor: pointer;
-    }
-    small {
-      color: #aaa;
-      font-size: 0.9rem;
+      display: block;
+      margin: 2rem auto 0;
     }
     #success {
-      margin-top: 1.5rem;
-      color: #0f0;
       text-align: center;
+      margin-top: 2rem;
+      color: #0f0;
       display: none;
     }
   </style>
@@ -56,8 +67,10 @@
       <option value="">Loading shows...</option>
     </select>
 
-    <label for="art">Upload Artwork <small>(or use the <a href="https://dj-artwork3-38cz.vercel.app/" target="_blank">Artwork Generator</a>)</small></label>
-    <input type="file" id="art" name="art" accept="image/*" />
+    <label for="artFile">Upload Artwork
+      <small><a href="https://dj-artwork3-38cz.vercel.app/" target="_blank">Use the artwork generator</a> first.</small>
+    </label>
+    <input type="file" id="artFile" accept="image/*" />
 
     <label for="showName">Change Show Name</label>
     <input type="text" id="showName" name="showName" placeholder="New show name" />
@@ -75,95 +88,95 @@
     <input type="text" id="timeChange" name="timeChange" placeholder="e.g. Can I move to Thursday?" />
 
     <button type="submit">Submit Changes</button>
-    <div id="success">✅ Your update has been submitted!</div>
   </form>
+
+  <div id="success">✅ Your update has been submitted!</div>
 
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script>
     const showSelect = document.getElementById('show');
     const form = document.getElementById('updateForm');
+    const artFile = document.getElementById('artFile');
     const successMsg = document.getElementById('success');
-    const scriptUrl = 'https://script.google.com/macros/s/AKfycbxHZ1MtV2323U9oQ9lRJPExbdlvf-XXe6CTPvkUvAwZHyVi2zzMxpu7aimMMoShjR-e/exec';
-    const csvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTavGvSojxM1vYpMv0FSoC-WzIK3IqTYPNl1SYbya4iV8VJUaEmHso7yghmGQPLJvwpsEMzKjbonPDz/pub?output=csv';
 
-    // Populate dropdown
-    Papa.parse(csvUrl, {
-      download: true,
-      header: true,
-      complete: (results) => {
-        const added = new Set();
-        results.data.forEach(row => {
-          const showID = row['Show ID']?.trim();
-          const djName = row['DJ']?.trim();
-          if (showID && djName && !added.has(showID)) {
-            const opt = document.createElement('option');
-            opt.value = showID;
-            opt.dataset.dj = djName;
-            opt.textContent = djName;
-            showSelect.appendChild(opt);
-            added.add(showID);
+    const csvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTavGvSojxM1vYpMv0FSoC-WzIK3IqTYPNl1SYbya4iV8VJUaEmHso7yghmGQPLJvwpsEMzKjbonPDz/pub?output=csv';
+    const scriptUrl = 'https://script.google.com/macros/s/AKfycbxHZ1MtV2323U9oQ9lRJPExbdlvf-XXe6CTPvkUvAwZHyVi2zzMxpu7aimMMoShjR-e/exec';
+
+    const showIdMap = {};
+
+    // Load dropdown from CSV
+    fetch(csvUrl)
+      .then(res => res.text())
+      .then(text => {
+        Papa.parse(text, {
+          header: true,
+          complete: results => {
+            showSelect.innerHTML = '<option value="">-- Select --</option>';
+            results.data.forEach(row => {
+              if (row['Show ID'] && row['DJ']) {
+                showIdMap[row['Show ID']] = row['DJ'];
+                const opt = document.createElement('option');
+                opt.value = row['Show ID'];
+                opt.textContent = row['DJ'];
+                showSelect.appendChild(opt);
+              }
+            });
           }
         });
-        showSelect.options[0].text = '-- Select --';
-      },
-      error: (err) => {
-        showSelect.innerHTML = '<option>Error loading shows</option>';
-        console.error(err);
-      }
-    });
-
-    form.addEventListener('submit', async function(e) {
-      e.preventDefault();
-      const formData = new FormData(form);
-      const params = new URLSearchParams();
-
-      // Add dropdown value and attached DJ name
-      const selectedOption = showSelect.options[showSelect.selectedIndex];
-      params.append('show', selectedOption.value);
-      params.append('dj', selectedOption.dataset.dj);
-
-      // Add text inputs
-      ['showName', 'guests', 'cancel', 'timeChange'].forEach(key => {
-        params.append(key, formData.get(key) || '');
       });
 
-      // Convert image file to base64
-      const file = formData.get('art');
-      if (file && file.name) {
+    // Convert file to base64
+    function fileToBase64(file) {
+      return new Promise((resolve, reject) => {
         const reader = new FileReader();
-        reader.onload = async function() {
-          const base64Data = reader.result;
-          params.append('artData', base64Data);
-
-          // Send POST
-          try {
-            const res = await fetch(scriptUrl, {
-              method: 'POST',
-              body: params,
-            });
-            const text = await res.text();
-            console.log('✅ Response:', text);
-            form.reset();
-            successMsg.style.display = 'block';
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          } catch (err) {
-            alert('❌ Failed to submit');
-            console.error(err);
-          }
-        };
+        reader.onload = e => resolve(e.target.result);
+        reader.onerror = e => reject(e);
         reader.readAsDataURL(file);
-      } else {
-        // No file uploaded, still submit
-        const res = await fetch(scriptUrl, {
-          method: 'POST',
-          body: params,
-        });
-        const text = await res.text();
-        console.log('✅ Response:', text);
+      });
+    }
+
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+
+      const showId = showSelect.value;
+      const djName = showIdMap[showId] || '';
+      const showName = document.getElementById('showName').value.trim();
+      const guests = document.getElementById('guests').value.trim();
+      const cancel = document.getElementById('cancel').value;
+      const timeChange = document.getElementById('timeChange').value.trim();
+
+      let artData = '';
+      if (artFile.files[0]) {
+        artData = await fileToBase64(artFile.files[0]);
+      }
+
+      const data = {
+        show: showId,
+        dj: djName,
+        artData,
+        showName,
+        guests,
+        cancel,
+        timeChange
+      };
+
+      const params = new URLSearchParams(data);
+
+      fetch(scriptUrl, {
+        method: 'POST',
+        body: params
+      })
+      .then(res => res.text())
+      .then(txt => {
         form.reset();
         successMsg.style.display = 'block';
         window.scrollTo({ top: 0, behavior: 'smooth' });
-      }
+        console.log('✅ Submitted:', txt);
+      })
+      .catch(err => {
+        alert('❌ Submission failed.');
+        console.error(err);
+      });
     });
   </script>
 </body>
