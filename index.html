@@ -67,10 +67,11 @@
       <option value="">Loading shows...</option>
     </select>
 
-    <label for="artFile">Upload Artwork
-      <small><a href="https://dj-artwork3-38cz.vercel.app/" target="_blank">Use the artwork generator</a> first.</small>
-    </label>
-    <input type="file" id="artFile" accept="image/*" />
+    <label for="dj">DJ Name</label>
+    <input type="text" id="dj" name="dj" placeholder="Your DJ name" required />
+
+    <label for="art">Upload Artwork (jpg/png)</label>
+    <input type="file" id="art" name="art" accept="image/*" />
 
     <label for="showName">Change Show Name</label>
     <input type="text" id="showName" name="showName" placeholder="New show name" />
@@ -96,88 +97,78 @@
   <script>
     const showSelect = document.getElementById('show');
     const form = document.getElementById('updateForm');
-    const artFile = document.getElementById('artFile');
     const successMsg = document.getElementById('success');
-
     const csvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTavGvSojxM1vYpMv0FSoC-WzIK3IqTYPNl1SYbya4iV8VJUaEmHso7yghmGQPLJvwpsEMzKjbonPDz/pub?output=csv';
     const scriptUrl = 'https://script.google.com/macros/s/AKfycbxHZ1MtV2323U9oQ9lRJPExbdlvf-XXe6CTPvkUvAwZHyVi2zzMxpu7aimMMoShjR-e/exec';
 
-    const showIdMap = {};
-
-    // Load dropdown from CSV
-    fetch(csvUrl)
-      .then(res => res.text())
-      .then(text => {
-        Papa.parse(text, {
-          header: true,
-          complete: results => {
-            showSelect.innerHTML = '<option value="">-- Select --</option>';
-            results.data.forEach(row => {
-              if (row['Show ID'] && row['DJ']) {
-                showIdMap[row['Show ID']] = row['DJ'];
-                const opt = document.createElement('option');
-                opt.value = row['Show ID'];
-                opt.textContent = row['DJ'];
-                showSelect.appendChild(opt);
-              }
-            });
+    Papa.parse(csvUrl, {
+      download: true,
+      header: true,
+      complete: function(results) {
+        const data = results.data;
+        data.forEach(row => {
+          if (row['Show ID'] && row['DJ']) {
+            const opt = document.createElement('option');
+            opt.value = row['Show ID'].trim();
+            opt.textContent = row['DJ'].trim();
+            showSelect.appendChild(opt);
           }
         });
-      });
+        if (showSelect.options.length > 1) {
+          showSelect.options[0].text = '-- Select --';
+        } else {
+          showSelect.options[0].text = 'No shows found';
+        }
+      }
+    });
 
-    // Convert file to base64
-    function fileToBase64(file) {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = e => resolve(e.target.result);
-        reader.onerror = e => reject(e);
-        reader.readAsDataURL(file);
-      });
-    }
-
-    form.addEventListener('submit', async e => {
+    form.addEventListener('submit', async (e) => {
       e.preventDefault();
 
-      const showId = showSelect.value;
-      const djName = showIdMap[showId] || '';
-      const showName = document.getElementById('showName').value.trim();
-      const guests = document.getElementById('guests').value.trim();
-      const cancel = document.getElementById('cancel').value;
-      const timeChange = document.getElementById('timeChange').value.trim();
-
-      let artData = '';
-      if (artFile.files[0]) {
-        artData = await fileToBase64(artFile.files[0]);
+      const formData = new FormData(form);
+      const plainData = {};
+      for (const [key, val] of formData.entries()) {
+        plainData[key] = val;
       }
 
-      const data = {
-        show: showId,
-        dj: djName,
-        artData,
-        showName,
-        guests,
-        cancel,
-        timeChange
-      };
+      // Handle artwork file
+      const artFile = form.art.files[0];
+      if (artFile) {
+        const reader = new FileReader();
+        reader.onloadend = function () {
+          plainData.artData = reader.result;
+          submitData(plainData);
+        };
+        reader.readAsDataURL(artFile);
+      } else {
+        submitData(plainData);
+      }
+    });
 
-      const params = new URLSearchParams(data);
+    function submitData(data) {
+      const params = new URLSearchParams();
+      for (const key in data) {
+        if (data[key]) {
+          params.append(key, data[key]);
+        }
+      }
 
       fetch(scriptUrl, {
         method: 'POST',
         body: params
       })
       .then(res => res.text())
-      .then(txt => {
-        form.reset();
+      .then(text => {
+        document.getElementById('updateForm').reset();
         successMsg.style.display = 'block';
         window.scrollTo({ top: 0, behavior: 'smooth' });
-        console.log('✅ Submitted:', txt);
+        console.log('✅ Submitted:', text);
       })
       .catch(err => {
-        alert('❌ Submission failed.');
-        console.error(err);
+        alert('❌ Failed to submit. Try again later.');
+        console.error('Submission error:', err);
       });
-    });
+    }
   </script>
 </body>
 </html>
